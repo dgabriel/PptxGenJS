@@ -62,9 +62,9 @@ Use JavaScript to create a PowerPoint presentation with your web browser right n
 
 # Installation
 ## Client-side Angular-cli
-### Install this branch with npm
+### Install this FORK with npm
 
-Download pptxgenjs-angular-1.0.0-beta.tgz to your project directory. 
+Download and copy pptxgenjs-angular-1.0.0-beta.tgz to your project directory. 
 
 Then run:
 ```javascript
