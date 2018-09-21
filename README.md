@@ -1,6 +1,6 @@
 [![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)](https://github.com/ellerbrock/open-source-badge/)  [![MIT Licence](https://img.shields.io/github/license/gitbrent/pptxgenjs.svg)](https://opensource.org/licenses/mit-license.php)  [![npm version](https://img.shields.io/npm/v/pptxgenjs.svg)](https://www.npmjs.com/package/pptxgenjs)  [![npm downloads](https://img.shields.io/npm/dm/pptxgenjs.svg)](https://www.npmjs.com/package/pptxgenjs)
 
-# PptxGenJS
+# PptxGenJS (Angular-cli compatible fork)
 
 ### JavaScript library that produces PowerPoint (pptx) presentations
 
@@ -61,7 +61,34 @@ Use JavaScript to create a PowerPoint presentation with your web browser right n
 [https://gitbrent.github.io/PptxGenJS](https://gitbrent.github.io/PptxGenJS)
 
 # Installation
-## Client-Side
+## Client-side Angular-cli
+### Install this branch with npm
+
+Download pptxgenjs-angular-1.0.0-beta.tgz to your project directory. 
+
+Then run:
+```javascript
+    npm install ./pptxgenjs-angular-1.0.0-beta.tgz
+```
+
+Update your project's angular.json file:
+
+            "scripts": [
+              "node_modules/pptxgenjs-angular/libs/jquery.min.js",
+              "node_modules/pptxgenjs-angular/libs/jszip.min.js",
+              "node_modules/pptxgenjs-angular/libs/promise.min.js",
+            ]
+
+Start the app:
+
+    ng serve
+    
+Now you can import PptxGenJS in your components like so:
+
+    import * as PptxGenJS  from 'pptxgenjs-angular'
+
+
+## Client-Side NON-ANGULAR, DO NOT USE THIS FORK
 ### Include Local Scripts
 ```javascript
 <script lang="javascript" src="PptxGenJS/libs/jquery.min.js"></script>

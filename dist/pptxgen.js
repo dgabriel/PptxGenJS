@@ -52,21 +52,9 @@ Number.isInteger = Number.isInteger || function(value) {
 
 // Detect Node.js (NODEJS is ultimately used to determine how to save: either `fs` or web-based, so using fs-detection is perfect)
 var NODEJS = false;
-{
-	// NOTE: `NODEJS` determines which network library to use, so using fs-detection is apropos.
-	if ( typeof module !== 'undefined' && module.exports && typeof require === 'function' ) {
-		try {
-			require.resolve('fs');
-			NODEJS = true;
-		}
-		catch (ex) {
-			NODEJS = false;
-		}
-	}
-}
 
 // [Node.js] <script> includes
-if ( NODEJS ) {
+if ( !NODEJS ) {
 	var gObjPptxColors = require('../dist/pptxgen.colors.js');
 	var gObjPptxShapes = require('../dist/pptxgen.shapes.js');
 }
@@ -5212,26 +5200,4 @@ var PptxGenJS = function(){
 	}
 };
 
-// [Node.js] support
-if ( NODEJS ) {
-	var $ = null;
-	var fs = null;
-	var JSZip = null;
-	var sizeOf = null;
-
-	// A: jQuery dependency
-	try {
-		var jsdom = require("jsdom");
-		var dom = new jsdom.JSDOM("<!DOCTYPE html>");
-		$ = require("jquery")(dom.window);
-	} catch(ex){ console.error("Unable to load `jquery`!\n"+ex); throw 'LIB-MISSING-JQUERY'; }
-
-	// B: Other dependencies
-	try { fs = require("fs"); } catch(ex){ console.error("Unable to load `fs`"); throw 'LIB-MISSING-FS'; }
-	try { https = require("https"); } catch(ex){ console.error("Unable to load `https`"); throw 'LIB-MISSING-HTTPS'; }
-	try { JSZip = require("jszip"); } catch(ex){ console.error("Unable to load `jszip`"); throw 'LIB-MISSING-JSZIP'; }
-	try { sizeOf = require("image-size"); } catch(ex){ console.error("Unable to load `image-size`"); throw 'LIB-MISSING-IMGSIZE'; }
-
-	// C: Export module
-	module.exports = PptxGenJS;
-}
+module.exports = PptxGenJS;
