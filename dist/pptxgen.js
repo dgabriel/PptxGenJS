@@ -62,7 +62,7 @@ if ( !NODEJS ) {
 var PptxGenJS = function(){
 	// APP
 	var APP_VER = "2.4.0-beta";
-	var APP_BLD = "20180913";
+	var APP_BLD = "20180927";
 
 	// CONSTANTS
 	var MASTER_OBJECTS = {
@@ -380,7 +380,6 @@ var PptxGenJS = function(){
 			var objHyperlink = (objImage.hyperlink || '');
 			var strImageData = (objImage.data || '');
 			var strImagePath = (objImage.path || '');
-
 			var imageRelId = target.rels.length + 1;
 
 			// REALITY-CHECK:
@@ -399,7 +398,9 @@ var PptxGenJS = function(){
 			if ( strImageData && /image\/(\w+)\;/.exec(strImageData) && /image\/(\w+)\;/.exec(strImageData).length > 0 ) {
 				strImgExtn = /image\/(\w+)\;/.exec(strImageData)[1];
 			}
-
+			else if ( strImageData && strImageData.toLowerCase().indexOf('image/svg+xml') > -1 ) {
+				strImgExtn = 'svg';
+			}
 			// STEP 2: Set type/path
 			resultObject.type  = 'image';
 			resultObject.image = (strImagePath || 'preencoded.png');
@@ -410,8 +411,8 @@ var PptxGenJS = function(){
 			// if ( !intWidth || !intHeight ) { var imgObj = getSizeFromImage(strImagePath);
 			var imgObj = { width:1, height:1 };
 			resultObject.options = {
-				x: (intPosX  || 0),
-				y: (intPosY  || 0),
+				x: (intPosX || 0),
+				y: (intPosY || 0),
 				cx: (intWidth || imgObj.width),
 				cy: (intHeight || imgObj.height),
 				rounding: (objImage.rounding || false),
@@ -420,15 +421,43 @@ var PptxGenJS = function(){
 			};
 
 			// STEP 4: Add this image to this Slide Rels (rId/rels count spans all slides! Count all images to get next rId)
-			target.rels.push({
-				path: (strImagePath || 'preencoded'+strImgExtn),
-				type: 'image/'+strImgExtn,
-				extn: strImgExtn,
-				data: (strImageData || ''),
-				rId:  imageRelId,
-				Target: '../media/image'+ (++gObjPptx.imageCounter) +'.'+ strImgExtn
-			});
-			resultObject.imageRid = imageRelId;
+			if ( strImgExtn == 'svg' ) {
+				// SVG files consume *TWO* rId's: (a png version and the svg image)
+				// <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
+			    // <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image2.svg"/>
+
+				target.rels.push({
+					path: (strImagePath || strImageData+'png'),
+					type: 'image/png',
+					extn: 'png',
+					data: (strImageData || ''),
+					rId:  imageRelId,
+					Target: '../media/image'+ (++gObjPptx.imageCounter) +'.png',
+					isSvgPng: true,
+					svgSize: { w:resultObject.options.cx, h:resultObject.options.cy }
+				});
+				resultObject.imageRid = imageRelId;
+				target.rels.push({
+					path: (strImagePath || strImageData),
+					type: 'image/'+strImgExtn,
+					extn: strImgExtn,
+					data: (strImageData || ''),
+					rId:  (imageRelId+1),
+					Target: '../media/image'+ (++gObjPptx.imageCounter) +'.'+ strImgExtn
+				});
+				resultObject.imageRid = (imageRelId+1);
+			}
+			else {
+				target.rels.push({
+					path: (strImagePath || 'preencoded.'+strImgExtn),
+					type: 'image/'+strImgExtn,
+					extn: strImgExtn,
+					data: (strImageData || ''),
+					rId:  imageRelId,
+					Target: '../media/image'+ (++gObjPptx.imageCounter) +'.'+ strImgExtn
+				});
+				resultObject.imageRid = imageRelId;
+			}
 
 			// STEP 5: (Issue#77) Hyperlink support
 			if ( typeof objHyperlink === 'object' ) {
@@ -1071,17 +1100,28 @@ var PptxGenJS = function(){
 						if ( slideItemObj.hyperlink && slideItemObj.hyperlink.slide ) strSlideXml += '<a:hlinkClick r:id="rId'+ slideItemObj.hyperlink.rId +'" tooltip="'+ (slideItemObj.hyperlink.tooltip ? encodeXmlEntities(slideItemObj.hyperlink.tooltip) : '') +'" action="ppaction://hlinksldjump" />';
 						strSlideXml += '    </p:cNvPr>';
 						strSlideXml += '    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>';
-						strSlideXml += '    <p:nvPr>' + genXmlPlaceholder(placeholderObj) + '</p:nvPr>';
+						strSlideXml += '    <p:nvPr>'+ genXmlPlaceholder(placeholderObj) +'</p:nvPr>';
 						strSlideXml += '  </p:nvPicPr>';
 						strSlideXml += '<p:blipFill>';
-						strSlideXml += '  <a:blip r:embed="rId' + slideItemObj.imageRid + '" cstate="print"/>';
+						// NOTE: This works for both cases: either `path` or `data` contains the SVG
+						if ( slideObject.rels.filter(function(rel){ return rel.rId == slideItemObj.imageRid })[0].extn == 'svg' ) {
+							strSlideXml += '<a:blip r:embed="rId'+ (slideItemObj.imageRid-1) +'"/>';
+							strSlideXml += '<a:extLst>';
+							strSlideXml += '  <a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}">';
+							strSlideXml += '    <asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rId'+ slideItemObj.imageRid +'"/>';
+							strSlideXml += '  </a:ext>';
+							strSlideXml += '</a:extLst>';
+						}
+						else {
+							strSlideXml += '<a:blip r:embed="rId'+ slideItemObj.imageRid +'"/>';
+						}
 						if (sizing && sizing.type) {
 							var boxW = sizing.w ? getSmartParseNumber(sizing.w, 'X') : cx,
 								boxH = sizing.h ? getSmartParseNumber(sizing.h, 'Y') : cy,
 								boxX = getSmartParseNumber(sizing.x || 0, 'X'),
 								boxY = getSmartParseNumber(sizing.y || 0, 'Y');
 
-								strSlideXml += gObjPptxGenerators.imageSizingXml[sizing.type]({w: width, h: height}, {w: boxW, h: boxH, x: boxX, y: boxY});
+							strSlideXml += gObjPptxGenerators.imageSizingXml[sizing.type]({w: width, h: height}, {w: boxW, h: boxH, x: boxX, y: boxY});
 							width = boxW;
 							height = boxH;
 						}
@@ -1947,7 +1987,7 @@ var PptxGenJS = function(){
 		var intRels = 0;
 
 		layout.rels.forEach(function(rel){
-			// Read and Encode each image into base64 for use in export
+			// Read and Encode each media lacking `data` into base64 (for use in export)
 			if ( rel.type != 'online' && rel.type != 'chart' && !rel.data && arrRelsDone.indexOf(rel.path) == -1 ) {
 				// Node local-file encoding is syncronous, so we can load all images here, then call export with a callback (if any)
 				if ( NODEJS && rel.path.indexOf('http') != 0 ) {
@@ -1971,6 +2011,12 @@ var PptxGenJS = function(){
 					convertImgToDataURL(rel);
 					arrRelsDone.push(rel.path);
 				}
+			}
+			else if ( rel.isSvgPng && rel.data && rel.data.toLowerCase().indexOf('image/svg') > -1 ) {
+				// The SVG base64 must be converted to PNG SVG before export
+				intRels++;
+				callbackImgToDataURLDone(rel.data, rel);
+				arrRelsDone.push(rel.path);
 			}
 		});
 
@@ -2000,9 +2046,9 @@ var PptxGenJS = function(){
 	/* Node equivalent of `convertImgToDataURL()`: Use https to fetch, then use Buffer to encode to base64 */
 	function convertRemoteMediaToDataURL(slideRel) {
 		https.get(slideRel.path, function(res){
-			var rawData = '';
+			var rawData = "";
 			res.setEncoding('binary'); // IMPORTANT: Only binary encoding works
-			res.on('data', function(chunk){ rawData += chunk; });
+			res.on("data", function(chunk){ rawData += chunk; });
 			res.on("end", function(){
 				var data = Buffer.from(rawData,'binary').toString('base64');
 				callbackImgToDataURLDone(data, slideRel);
@@ -2013,7 +2059,56 @@ var PptxGenJS = function(){
 		});
 	}
 
+	/* browser: Convert SVG-base64 data to PNG-base64 */
+	function convertSvgToPngViaCanvas(slideRel) {
+		// A: Create
+		var image = new Image();
+
+		// B: Set onload event
+		image.onload = function(){
+			// First: Check for any errors: This is the best method (try/catch wont work, etc.)
+			if (this.width + this.height == 0) { this.onerror('h/w=0'); return; }
+			var canvas = document.createElement('CANVAS');
+			var ctx = canvas.getContext('2d');
+			canvas.width  = this.width;
+			canvas.height = this.height;
+			ctx.drawImage(this, 0, 0);
+			// Users running on local machine will get the following error:
+			// "SecurityError: Failed to execute 'toDataURL' on 'HTMLCanvasElement': Tainted canvases may not be exported."
+			// when the canvas.toDataURL call executes below.
+			try { callbackImgToDataURLDone( canvas.toDataURL(slideRel.type), slideRel ); }
+			catch(ex) {
+				this.onerror(ex);
+				return;
+			}
+			canvas = null;
+		};
+		image.onerror = function(ex){
+			console.error(ex||'');
+			// Return a predefined "Broken image" graphic so the user will see something on the slide
+			callbackImgToDataURLDone(IMG_BROKEN, slideRel);
+		};
+
+		// C: Load image
+		image.src = slideRel.data; // use pre-encoded SVG base64 data
+	}
+
+	/* nide: Convert SVG-base64 data to PNG-base64 */
+	function convertSvgToPngViaNode(slideRel) {
+		// TODO:
+		// require(svg-to-png)
+	}
+
 	function callbackImgToDataURLDone(base64Data, slideRel) {
+		// SVG images were retrieved via `convertImgToDataURL()`, but have to be encoded to PNG now
+		if ( slideRel.isSvgPng && base64Data.indexOf('image/svg') > -1 ) {
+			// Pass the SVG XML as base64 for conversion to PNG
+			slideRel.data = base64Data;
+			if ( NODEJS ) convertSvgToPngViaNode(slideRel);
+			else convertSvgToPngViaCanvas(slideRel);
+			return;
+		}
+
 		var intEmpty = 0;
 		var funcCallback = function(rel){
 			if ( rel.path == slideRel.path ) rel.data = base64Data;
@@ -4884,6 +4979,8 @@ var PptxGenJS = function(){
 			if ( !Array.isArray(arrRows[0]) ) arrRows = [ arrTabRows ];
 
 			// STEP 3: Set options
+// TODO: FIXME:
+//options.x        = ( options.x || (options.x == 0 ? 0 : 1) );
 			opt.x          = getSmartParseNumber( (opt.x || (EMU/2)), 'X' );
 			opt.y          = getSmartParseNumber( (opt.y || EMU), 'Y' );
 			opt.cy         = opt.h || opt.cy; // NOTE: Dont set default `cy` - leaving it null triggers auto-rowH in `makeXMLSlide()`
